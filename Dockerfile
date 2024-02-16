@@ -1,32 +1,18 @@
-# Use an official PHP runtime as a base image
-FROM php:8.1-apache
 
-# Set the working directory in the container
-WORKDIR /var/www/html
+FROM php:8.1 as php
 
-# Copy composer.lock and composer.json
-COPY composer.lock composer.json /var/www/html/
+RUN apt-get update -y
+RUN apt-get install -y unzip libpq-dev libcurl4-gnutls-dev
+RUN docker-php-ext-install pdo pdo_mysql bcmath
 
-# Install PHP extensions and dependencies
-RUN apt-get update && \
-    apt-get install -y \
-        git \
-        zip \
-        unzip && \
-    docker-php-ext-install pdo pdo_mysql && \
-    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+RUN pecl install -o -f redis \
+    && rm -rf /tmp/pear \
+    && docker-php-ext-enable redis
 
-# Install application dependencies
-RUN composer install
+WORKDIR /var/www
+COPY . .
 
-# Copy the application code into the container
-COPY . /var/www/html/
+COPY --from=composer:2.3.5 /usr/bin/composer /usr/bin/composer
 
-# Change ownership of the application directory
-RUN chown -R www-data:www-data /var/www/html/storage
-
-# Expose port 80 to the outside world
-EXPOSE 80
-
-# Start the Apache web server
-CMD ["apache2-foreground"]
+ENV PORT=8000
+ENTRYPOINT [ "Docker/entrypoint.sh" ]
